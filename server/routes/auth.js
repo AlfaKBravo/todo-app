@@ -3,6 +3,9 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { PrismaClient } = require('@prisma/client');
 const passport = require('passport');
+const speakeasy = require('speakeasy');
+const qrcode = require('qrcode');
+const authMiddleware = require('../middleware/auth');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -60,8 +63,101 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
 
+    // Check if MFA is enabled
+    if (user.mfaEnabled) {
+      return res.status(200).json({ 
+        mfaRequired: true, 
+        userId: user.id,
+        message: 'MFA token required' 
+      });
+    }
+
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '1h' });
     res.json({ token, user: { id: user.id, email: user.email } });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Verify MFA Token during Login
+router.post('/mfa/verify', async (req, res) => {
+  const { userId, token } = req.body;
+  try {
+    const user = await prisma.user.findUnique({ where: { id: Number(userId) } });
+    if (!user || !user.mfaSecret) {
+      return res.status(400).json({ message: 'Invalid request' });
+    }
+
+    const verified = speakeasy.totp.verify({
+      secret: user.mfaSecret,
+      encoding: 'base32',
+      token
+    });
+
+    if (!verified) {
+      return res.status(400).json({ message: 'Invalid MFA token' });
+    }
+
+    const jwtToken = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '1h' });
+    res.json({ token: jwtToken, user: { id: user.id, email: user.email } });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Setup MFA (Generate Secret)
+router.post('/mfa/setup', authMiddleware, async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user.userId } });
+    
+    // Generate a new secret
+    const secret = speakeasy.generateSecret({
+      name: `TodoApp:${user.email}`
+    });
+
+    // Temporarily save secret (but don't enable yet)
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { mfaSecret: secret.base32 }
+    });
+
+    // Generate QR code
+    const qrCodeUrl = await qrcode.toDataURL(secret.otpauth_url);
+    res.json({ qrCodeUrl, secret: secret.base32 });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Enable MFA (Confirm first token)
+router.post('/mfa/enable', authMiddleware, async (req, res) => {
+  const { token } = req.body;
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user.userId } });
+    
+    if (!user.mfaSecret) {
+      return res.status(400).json({ message: 'MFA setup not initiated' });
+    }
+
+    const verified = speakeasy.totp.verify({
+      secret: user.mfaSecret,
+      encoding: 'base32',
+      token
+    });
+
+    if (!verified) {
+      return res.status(400).json({ message: 'Invalid MFA token' });
+    }
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { mfaEnabled: true }
+    });
+
+    res.json({ message: 'MFA enabled successfully' });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error' });

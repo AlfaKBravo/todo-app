@@ -17,9 +17,11 @@ const Navbar = () => {
       <Link to="/" className="navbar-brand">TodoApp</Link>
       <div>
         {user ? (
-          <button onClick={handleLogout} className="btn btn-outline" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <LogOut size={16} /> Logout
-          </button>
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>{user.email}</span>
+              <Link to="/settings" className="btn btn-outline" style={{ padding: '0.25rem 0.75rem', fontSize: '0.875rem' }}>Settings</Link>
+              <button onClick={logout} className="btn btn-outline" style={{ padding: '0.25rem 0.75rem', fontSize: '0.875rem' }}>Logout</button>
+            </div>
         ) : (
           <div style={{ display: 'flex', gap: '1rem' }}>
             <Link to="/login" className="btn btn-outline" style={{ textDecoration: 'none' }}>Login</Link>

@@ -16,6 +16,8 @@ model User {
   email     String   @unique
   password  String?
   googleId  String?  @unique
+  mfaEnabled Boolean  @default(false)
+  mfaSecret  String?
   createdAt DateTime @default(now())
   todos     Todo[]
 }

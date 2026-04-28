@@ -30,9 +30,7 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
-  const login = async (email, password) => {
-    const res = await axios.post('http://localhost:5000/api/auth/login', { email, password });
-    const { token, user } = res.data;
+  const login = (token, user) => {
     localStorage.setItem('token', token);
     localStorage.setItem('user', JSON.stringify(user));
     setUser(user);
@@ -40,12 +38,9 @@ export const AuthProvider = ({ children }) => {
   };
 
   const register = async (email, password) => {
-    const res = await axios.post('http://localhost:5000/api/auth/register', { email, password });
+    const res = await axios.post('/api/auth/register', { email, password });
     const { token, user } = res.data;
-    localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(user));
-    setUser(user);
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    login(token, user);
   };
 
   const logout = () => {
