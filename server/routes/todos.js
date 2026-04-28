@@ -1,5 +1,6 @@
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
+const { encrypt, decrypt } = require('../utils/crypto');
 const authMiddleware = require('../middleware/auth');
 const redisClient = require('../utils/redis');
 
@@ -26,10 +27,16 @@ router.get('/', async (req, res) => {
       orderBy: { createdAt: 'desc' },
     });
 
+    // Decrypt titles
+    const decryptedTodos = todos.map(todo => ({
+      ...todo,
+      title: decrypt(todo.title)
+    }));
+
     // Store in Redis with 1 hour TTL
-    await redisClient.setEx(cacheKey, 3600, JSON.stringify(todos));
+    await redisClient.setEx(cacheKey, 3600, JSON.stringify(decryptedTodos));
     
-    res.json(todos);
+    res.json(decryptedTodos);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error' });
@@ -45,15 +52,18 @@ router.post('/', async (req, res) => {
   try {
     const todo = await prisma.todo.create({
       data: {
-        title,
+        title: encrypt(title),
         userId: req.user.userId,
       },
     });
 
+    // Return decrypted to frontend
+    const responseTodo = { ...todo, title: decrypt(todo.title) };
+
     // Invalidate Cache
     await redisClient.del(`todos:${req.user.userId}`);
 
-    res.status(201).json(todo);
+    res.status(201).json(responseTodo);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error' });
@@ -74,15 +84,18 @@ router.put('/:id', async (req, res) => {
     const todo = await prisma.todo.update({
       where: { id: Number(id) },
       data: {
-        title: title !== undefined ? title : existingTodo.title,
+        title: title !== undefined ? encrypt(title) : existingTodo.title,
         completed: completed !== undefined ? completed : existingTodo.completed,
       },
     });
 
+    // Return decrypted
+    const responseTodo = { ...todo, title: decrypt(todo.title) };
+
     // Invalidate Cache
     await redisClient.del(`todos:${req.user.userId}`);
 
-    res.json(todo);
+    res.json(responseTodo);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error' });
