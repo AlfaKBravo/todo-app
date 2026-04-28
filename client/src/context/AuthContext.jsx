@@ -8,13 +8,24 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const storedUser = localStorage.getItem('user');
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token') || localStorage.getItem('token');
+    const storedUser = urlParams.get('user') || localStorage.getItem('user');
     
     if (token && storedUser) {
-      setUser(JSON.parse(storedUser));
-      // Set default header
+      const parsedUser = typeof storedUser === 'string' && storedUser.startsWith('{') 
+        ? JSON.parse(storedUser) 
+        : storedUser;
+
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(parsedUser));
+      setUser(parsedUser);
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+
+      // Clean up URL
+      if (urlParams.get('token')) {
+        window.history.replaceState({}, document.title, "/");
+      }
     }
     setLoading(false);
   }, []);

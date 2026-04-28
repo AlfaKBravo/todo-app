@@ -1,4 +1,4 @@
-version: '3.8'
+# version: '3.8' (obsolete)
 
 services:
   db:
@@ -20,6 +20,8 @@ services:
       dockerfile: Dockerfile.dev
     container_name: todo_backend
     restart: always
+    env_file:
+      - ./server/.env
     environment:
       - DATABASE_URL=postgresql://postgres:password@db:5432/todo_app_db?schema=public
       - JWT_SECRET=my_super_secret_dev_key

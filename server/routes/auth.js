@@ -2,11 +2,24 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { PrismaClient } = require('@prisma/client');
+const passport = require('passport');
 
 const router = express.Router();
 const prisma = new PrismaClient();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_super_secret_key_123';
+
+// Google OAuth Routes
+router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+
+router.get('/google/callback', 
+  passport.authenticate('google', { failureRedirect: '/login', session: false }),
+  (req, res) => {
+    const token = jwt.sign({ userId: req.user.id }, JWT_SECRET, { expiresIn: '1h' });
+    const userStr = encodeURIComponent(JSON.stringify({ id: req.user.id, email: req.user.email }));
+    res.redirect(`http://localhost:5173/login?token=${token}&user=${userStr}`);
+  }
+);
 
 // Register User
 router.post('/register', async (req, res) => {
