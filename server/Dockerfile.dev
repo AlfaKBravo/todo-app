@@ -1,0 +1,23 @@
+FROM node:20
+
+WORKDIR /app
+
+# Install dependencies first for better caching
+COPY package*.json ./
+RUN npm install
+
+# Copy Prisma schema and generate client
+# We do this before copying the rest of the code so it's cached unless schema changes
+COPY prisma ./prisma
+RUN npx prisma generate
+
+# Copy the rest of the application
+COPY . .
+
+# We map this directory in docker-compose, but we copy it here for a standalone build just in case.
+
+EXPOSE 5000
+
+# We use a shell script or directly run nodemon
+# npx prisma db push ensures the DB is migrated before starting
+CMD ["sh", "-c", "npx prisma db push && npm run dev"]
