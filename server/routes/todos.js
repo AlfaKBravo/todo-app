@@ -1,6 +1,7 @@
 const express = require('express');
 const { PrismaClient } = require('@prisma/client');
 const authMiddleware = require('../middleware/auth');
+const redisClient = require('../utils/redis');
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -10,11 +11,24 @@ router.use(authMiddleware);
 
 // Get all todos for a user
 router.get('/', async (req, res) => {
+  const cacheKey = `todos:${req.user.userId}`;
   try {
+    // Try to fetch from Redis
+    const cachedTodos = await redisClient.get(cacheKey);
+    if (cachedTodos) {
+      console.log('Cache Hit: Returning todos from Redis');
+      return res.json(JSON.parse(cachedTodos));
+    }
+
+    console.log('Cache Miss: Fetching todos from Database');
     const todos = await prisma.todo.findMany({
       where: { userId: req.user.userId },
       orderBy: { createdAt: 'desc' },
     });
+
+    // Store in Redis with 1 hour TTL
+    await redisClient.setEx(cacheKey, 3600, JSON.stringify(todos));
+    
     res.json(todos);
   } catch (error) {
     console.error(error);
@@ -35,6 +49,10 @@ router.post('/', async (req, res) => {
         userId: req.user.userId,
       },
     });
+
+    // Invalidate Cache
+    await redisClient.del(`todos:${req.user.userId}`);
+
     res.status(201).json(todo);
   } catch (error) {
     console.error(error);
@@ -60,6 +78,10 @@ router.put('/:id', async (req, res) => {
         completed: completed !== undefined ? completed : existingTodo.completed,
       },
     });
+
+    // Invalidate Cache
+    await redisClient.del(`todos:${req.user.userId}`);
+
     res.json(todo);
   } catch (error) {
     console.error(error);
@@ -77,6 +99,10 @@ router.delete('/:id', async (req, res) => {
     }
 
     await prisma.todo.delete({ where: { id: Number(id) } });
+
+    // Invalidate Cache
+    await redisClient.del(`todos:${req.user.userId}`);
+
     res.json({ message: 'Todo removed' });
   } catch (error) {
     console.error(error);
