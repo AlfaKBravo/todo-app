@@ -45,7 +45,7 @@ const Dashboard = () => {
       const { id: order_id, amount, currency } = orderRes.data;
 
       const options = {
-        key: 'rzp_test_your_key_id', // Should match .env RAZORPAY_KEY_ID
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID, // Uses the key from .env
         amount: amount,
         currency: currency,
         name: 'TodoApp Pro',
