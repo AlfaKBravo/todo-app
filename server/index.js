@@ -6,6 +6,7 @@ const session = require('express-session');
 const passport = require('./config/passport');
 const authRoutes = require('./routes/auth');
 const todoRoutes = require('./routes/todos');
+const paymentRoutes = require('./routes/payment');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -25,6 +26,7 @@ app.use(passport.session());
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/todos', todoRoutes);
+app.use('/api/payment', paymentRoutes);
 
 app.get('/', (req, res) => {
   res.send('To-Do API is running...');

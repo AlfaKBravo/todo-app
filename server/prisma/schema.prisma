@@ -18,6 +18,7 @@ model User {
   googleId  String?  @unique
   mfaEnabled Boolean  @default(false)
   mfaSecret  String?
+  isPro      Boolean  @default(false)
   createdAt DateTime @default(now())
   todos     Todo[]
 }

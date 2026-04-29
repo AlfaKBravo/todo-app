@@ -29,9 +29,62 @@ const Dashboard = () => {
       setTodos([res.data, ...todos]);
       setTitle('');
     } catch (err) {
-      console.error('Error adding todo:', err);
+      if (err.response?.status === 403 && err.response?.data?.limitReached) {
+        if (window.confirm(err.response.data.message + " Would you like to upgrade now?")) {
+          handlePayment();
+        }
+      } else {
+        console.error('Error adding todo:', err);
+      }
     }
   };
+
+  const handlePayment = async () => {
+    try {
+      const orderRes = await axios.post('/api/payment/order');
+      const { id: order_id, amount, currency } = orderRes.data;
+
+      const options = {
+        key: 'rzp_test_your_key_id', // Should match .env RAZORPAY_KEY_ID
+        amount: amount,
+        currency: currency,
+        name: 'TodoApp Pro',
+        description: 'Unlock unlimited tasks',
+        order_id: order_id,
+        handler: async (response) => {
+          try {
+            const verifyRes = await axios.post('/api/payment/verify', response);
+            alert(verifyRes.data.message);
+            window.location.reload(); // Refresh to update user state
+          } catch (error) {
+            alert('Payment verification failed');
+          }
+        },
+        prefill: {
+          email: user.email,
+        },
+        theme: {
+          color: '#3b82f6',
+        },
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+    } catch (err) {
+      console.error('Payment Error:', err);
+      alert('Failed to initiate payment');
+    }
+  };
+
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    document.body.appendChild(script);
+    return () => {
+      document.body.removeChild(script);
+    }
+  }, []);
 
   const toggleTodo = async (id, completed) => {
     try {

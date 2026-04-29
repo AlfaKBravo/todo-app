@@ -50,6 +50,16 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ message: 'Title is required' });
   }
   try {
+    const user = await prisma.user.findUnique({ where: { id: req.user.userId } });
+    const count = await prisma.todo.count({ where: { userId: req.user.userId } });
+
+    if (!user.isPro && count >= 5) {
+      return res.status(403).json({ 
+        message: 'Free limit reached (5 tasks). Upgrade to Pro for unlimited tasks!',
+        limitReached: true 
+      });
+    }
+
     const todo = await prisma.todo.create({
       data: {
         title: encrypt(title),
